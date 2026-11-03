@@ -75,6 +75,10 @@ class ResetPasswordRequest(BaseModel):
 
 app = FastAPI()
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 create_password_reset_table()
 
 security = HTTPBearer()
