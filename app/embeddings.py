@@ -1,10 +1,14 @@
+
 from functools import lru_cache
-from sentence_transformers import SentenceTransformer
+
 
 @lru_cache(maxsize=1)
 def get_embedding_model():
-    """Load the embedding model only when it is first needed."""
+    """Import and load the embedding model only when first needed."""
+    from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer("all-MiniLM-L6-v2")
+
 
 def create_chunks(text, chunk_size=50):
     words = text.split()
@@ -15,6 +19,7 @@ def create_chunks(text, chunk_size=50):
         chunks.append(chunk)
 
     return chunks
+
 
 def generate_embedding(text):
     model = get_embedding_model()
