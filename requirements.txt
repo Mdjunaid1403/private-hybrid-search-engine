@@ -26,3 +26,8 @@ resend==2.50.1
 rapidfuzz
 PyMuPDF
 python-docx==1.2.0
+python-pptx==1.0.2
+openpyxl==3.1.5
+beautifulsoup4==4.15.0
+pytesseract==0.3.13
+Pillow==12.3.0
