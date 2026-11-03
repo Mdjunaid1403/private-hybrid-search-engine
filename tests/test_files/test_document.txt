@@ -1,0 +1,2 @@
+Python is a programming language used for software development.
+It is popular for web development, data science, automation, and artificial intelligence.
