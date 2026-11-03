@@ -24,3 +24,4 @@ PyJWT==2.15.0
 sentence-transformers==6.0.1
 resend==2.50.1
 rapidfuzz
+PyMuPDF
