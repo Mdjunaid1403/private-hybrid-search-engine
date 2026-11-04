@@ -1,5 +1,6 @@
 
 import logging
+import time
 
 from ddgs import DDGS
 from ddgs.exceptions import DDGSException
@@ -8,12 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 def search_web(query, max_results=5):
-    try:
-        with DDGS(timeout=10) as ddgs:
-            results = ddgs.text(
-                query,
-                max_results=max_results
-            )
+    for attempt in range(2):
+        try:
+            with DDGS(timeout=20) as ddgs:
+                results = ddgs.text(
+                    query,
+                    max_results=max_results
+                )
 
             logger.info(
                 "Web search query=%r returned %d results",
@@ -23,9 +25,14 @@ def search_web(query, max_results=5):
 
             return results
 
-    except DDGSException:
-        logger.exception(
-            "Web search failed for query=%r",
-            query
-        )
-        return []
+        except DDGSException:
+            logger.exception(
+                "Web search failed on attempt %d for query=%r",
+                attempt + 1,
+                query
+            )
+
+            if attempt == 0:
+                time.sleep(1)
+
+    return []
