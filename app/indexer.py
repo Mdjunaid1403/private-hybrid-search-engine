@@ -37,22 +37,20 @@ def build_index(documents):
     index = {}
 
     for document in documents:
+        filename = document["filename"]
         words = document["content"].split()
+        unique_words = dict.fromkeys(
+            normalize_word(word) for word in words
+        )
 
-        words = [
-            normalize_word(word)
-            for word in words
-        ]
-
-        for word in words:
+        for word in unique_words:
             if not word or word in STOP_WORDS:
                 continue
 
             if word not in index:
                 index[word] = []
 
-            if document["filename"] not in index[word]:
-                index[word].append(document["filename"])
+            index[word].append(filename)
 
     return index
 

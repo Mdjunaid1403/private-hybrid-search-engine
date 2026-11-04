@@ -21,7 +21,6 @@ uvicorn==0.52.4
 python-dotenv==1.2.3
 argon2-cffi==25.1.0
 PyJWT==2.15.0
-sentence-transformers==6.0.1
 resend==2.50.1
 rapidfuzz
 PyMuPDF
@@ -31,3 +30,4 @@ openpyxl==3.1.5
 beautifulsoup4==4.15.0
 pytesseract==0.3.13
 Pillow==12.3.0
+fastembed

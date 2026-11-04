@@ -489,12 +489,9 @@ async def upload_document(
 
     chunks = create_chunks(text)
 
-    embeddings = [
-        generate_embedding(chunk)
-        for chunk in chunks
-    ]
+    for chunk in chunks:
+        embedding = generate_embedding(chunk)
 
-    for chunk, embedding in zip(chunks, embeddings):
         store_chunk(
             document_id,
             chunk,
