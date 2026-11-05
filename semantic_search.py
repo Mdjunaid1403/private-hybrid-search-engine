@@ -29,4 +29,11 @@ def semantic_search(query, user_id, limit=5):
     cur.close()
     conn.close()
 
-    return results
+    # Filter out semantically irrelevant chunks
+    relevant_results = [
+        result
+        for result in results
+        if result[4] <= 0.5
+    ]
+
+    return relevant_results
