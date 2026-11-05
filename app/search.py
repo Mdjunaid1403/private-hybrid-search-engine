@@ -1,3 +1,4 @@
+
 import logging
 import math
 import re
@@ -7,17 +8,13 @@ from collections import Counter
 from ddgs import DDGS
 from ddgs.exceptions import DDGSException
 
-from importlib.metadata import version
-
 logger = logging.getLogger(__name__)
 
 STOP_WORDS = {
     "find", "show", "search", "which", "what", "where",
     "the", "a", "an", "and", "or", "to", "of", "that",
     "for", "is", "are", "was", "were", "be", "been",
-    "in", "on", "at", "by", "with", "how", "do", "does",
-    "other", "problem", "problems", "finding",
-    "element", "elements"
+    "in", "on", "at", "by", "with", "how", "do", "does"
 }
 
 
@@ -33,7 +30,7 @@ def cosine_similarity(query, document):
     if not query_words or not document_words:
         return 0.0
 
-    # documents = [query_words, document_words]
+    documents = [query_words, document_words]
 
     document_frequency = Counter(
         word
@@ -81,60 +78,49 @@ def filter_relevant_results(query, results):
     relevant_results = []
     seen_urls = set()
 
-    query_words = set(tokenize(query))
-    minimum_matches = min(2, len(query_words))
-
     for result in results:
         title = (result.get("title") or "").strip()
         body = (result.get("body") or "").strip()
         url = (result.get("href") or "").strip()
 
-        # Reject incomplete results
+        # 1. Reject incomplete results
         if not title or not body or not url:
             continue
 
-        # Reject suspiciously long titles
+        # 2. Reject suspiciously long titles
         if len(title) > 180:
             continue
 
-        # Reject concatenated titles
+        # 3. Detect titles containing concatenated article titles
         concatenated_parts = re.findall(r"[a-z][A-Z]", title)
 
         if len(concatenated_parts) >= 2:
             continue
 
-        # Remove duplicate URLs
+        # 4. Remove duplicate URLs
         normalized_url = url.rstrip("/").lower()
 
         if normalized_url in seen_urls:
             continue
 
-        # Calculate meaningful keyword matches
-        result_words = set(tokenize(f"{title} {body}"))
-        matched_words = query_words.intersection(result_words)
+        seen_urls.add(normalized_url)
 
-        if len(matched_words) < minimum_matches:
-            continue
-
-        # Calculate similarity
-        score = cosine_similarity(
-            query,
-            f"{title} {body}"
-        )
+        # 5. Calculate relevance
+        score = cosine_similarity(query, f"{title} {body}")
 
         if score < 0.10:
             continue
 
-        seen_urls.add(normalized_url)
-
         result["_relevance_score"] = score
         relevant_results.append(result)
 
+    # 6. Sort by relevance
     relevant_results.sort(
         key=lambda item: item["_relevance_score"],
         reverse=True
     )
 
+    # 7. Remove internal scoring information
     for result in relevant_results:
         result.pop("_relevance_score", None)
 
@@ -154,11 +140,6 @@ def search_web(query, max_results=5):
 
     all_results = []
 
-    logger.info(
-        "DIAGNOSTIC: Installed DDGS version: %s",
-        version("ddgs")
-    )
-
     for search_query in fallback_queries:
         for attempt in range(2):
             try:
@@ -166,15 +147,8 @@ def search_web(query, max_results=5):
                     results = ddgs.text(
                         search_query,
                         max_results=max_results,
-                        backend="yahoo"
+                        backend="bing,google,brave,mojeek,yahoo"
                     )
-
-                logger.info(
-                    "DIAGNOSTIC: Query=%r | Raw result count=%d | Titles=%r",
-                    search_query,
-                    len(results),
-                    [r.get("title", "") for r in results]
-                )
 
                 all_results.extend(results)
 
@@ -195,14 +169,6 @@ def search_web(query, max_results=5):
     relevant_results = filter_relevant_results(
         query,
         all_results
-    )
-
-    logger.info(
-        "DIAGNOSTIC: Original query=%r | Total raw results=%d | Filtered results=%d | Final titles=%r",
-        query,
-        len(all_results),
-        len(relevant_results),
-        [r.get("title", "") for r in relevant_results]
     )
 
     logger.info(
