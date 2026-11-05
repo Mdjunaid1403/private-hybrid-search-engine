@@ -14,7 +14,9 @@ STOP_WORDS = {
     "find", "show", "search", "which", "what", "where",
     "the", "a", "an", "and", "or", "to", "of", "that",
     "for", "is", "are", "was", "were", "be", "been",
-    "in", "on", "at", "by", "with", "how", "do", "does"
+    "in", "on", "at", "by", "with", "how", "do", "does",
+    "other", "problem", "problems", "finding",
+    "element", "elements"
 }
 
 
@@ -78,49 +80,60 @@ def filter_relevant_results(query, results):
     relevant_results = []
     seen_urls = set()
 
+    query_words = set(tokenize(query))
+    minimum_matches = min(2, len(query_words))
+
     for result in results:
         title = (result.get("title") or "").strip()
         body = (result.get("body") or "").strip()
         url = (result.get("href") or "").strip()
 
-        # 1. Reject incomplete results
+        # Reject incomplete results
         if not title or not body or not url:
             continue
 
-        # 2. Reject suspiciously long titles
+        # Reject suspiciously long titles
         if len(title) > 180:
             continue
 
-        # 3. Detect titles containing concatenated article titles
+        # Reject concatenated titles
         concatenated_parts = re.findall(r"[a-z][A-Z]", title)
 
         if len(concatenated_parts) >= 2:
             continue
 
-        # 4. Remove duplicate URLs
+        # Remove duplicate URLs
         normalized_url = url.rstrip("/").lower()
 
         if normalized_url in seen_urls:
             continue
 
-        seen_urls.add(normalized_url)
+        # Calculate meaningful keyword matches
+        result_words = set(tokenize(f"{title} {body}"))
+        matched_words = query_words.intersection(result_words)
 
-        # 5. Calculate relevance
-        score = cosine_similarity(query, f"{title} {body}")
+        if len(matched_words) < minimum_matches:
+            continue
+
+        # Calculate similarity
+        score = cosine_similarity(
+            query,
+            f"{title} {body}"
+        )
 
         if score < 0.10:
             continue
 
+        seen_urls.add(normalized_url)
+
         result["_relevance_score"] = score
         relevant_results.append(result)
 
-    # 6. Sort by relevance
     relevant_results.sort(
         key=lambda item: item["_relevance_score"],
         reverse=True
     )
 
-    # 7. Remove internal scoring information
     for result in relevant_results:
         result.pop("_relevance_score", None)
 
