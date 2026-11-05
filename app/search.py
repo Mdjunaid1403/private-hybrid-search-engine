@@ -166,7 +166,7 @@ def search_web(query, max_results=5):
                     results = ddgs.text(
                         search_query,
                         max_results=max_results,
-                        backend="mojeek,yahoo"
+                        backend="yahoo"
                     )
 
                 logger.info(
