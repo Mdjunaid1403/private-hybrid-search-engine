@@ -1,31 +1,144 @@
 
 import logging
+import math
 import re
 import time
+from collections import Counter
 
 from ddgs import DDGS
 from ddgs.exceptions import DDGSException
 
 logger = logging.getLogger(__name__)
 
+STOP_WORDS = {
+    "find", "show", "search", "which", "what", "where",
+    "the", "a", "an", "and", "or", "to", "of", "that",
+    "for", "is", "are", "was", "were", "be", "been",
+    "in", "on", "at", "by", "with", "how", "do", "does"
+}
+
+
+def tokenize(text):
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return [word for word in words if word not in STOP_WORDS]
+
+
+def cosine_similarity(query, document):
+    query_words = tokenize(query)
+    document_words = tokenize(document)
+
+    if not query_words or not document_words:
+        return 0.0
+
+    documents = [query_words, document_words]
+
+    document_frequency = Counter(
+        word
+        for word in set(query_words)
+        for _ in [0]
+    )
+
+    for word in set(document_words):
+        document_frequency[word] += 1
+
+    def make_vector(words):
+        counts = Counter(words)
+        vector = {}
+
+        for word, count in counts.items():
+            idf = math.log(
+                1 + 2 / (1 + document_frequency[word])
+            )
+            vector[word] = (1 + math.log(count)) * idf
+
+        return vector
+
+    query_vector = make_vector(query_words)
+    document_vector = make_vector(document_words)
+
+    dot_product = sum(
+        value * document_vector.get(word, 0)
+        for word, value in query_vector.items()
+    )
+
+    query_norm = math.sqrt(
+        sum(value ** 2 for value in query_vector.values())
+    )
+    document_norm = math.sqrt(
+        sum(value ** 2 for value in document_vector.values())
+    )
+
+    if not query_norm or not document_norm:
+        return 0.0
+
+    return dot_product / (query_norm * document_norm)
+
+
+def filter_relevant_results(query, results):
+    relevant_results = []
+    seen_urls = set()
+
+    for result in results:
+        title = (result.get("title") or "").strip()
+        body = (result.get("body") or "").strip()
+        url = (result.get("href") or "").strip()
+
+        # 1. Reject incomplete results
+        if not title or not body or not url:
+            continue
+
+        # 2. Reject suspiciously long titles
+        if len(title) > 180:
+            continue
+
+        # 3. Detect titles containing concatenated article titles
+        concatenated_parts = re.findall(r"[a-z][A-Z]", title)
+
+        if len(concatenated_parts) >= 2:
+            continue
+
+        # 4. Remove duplicate URLs
+        normalized_url = url.rstrip("/").lower()
+
+        if normalized_url in seen_urls:
+            continue
+
+        seen_urls.add(normalized_url)
+
+        # 5. Calculate relevance
+        score = cosine_similarity(query, f"{title} {body}")
+
+        if score < 0.10:
+            continue
+
+        result["_relevance_score"] = score
+        relevant_results.append(result)
+
+    # 6. Sort by relevance
+    relevant_results.sort(
+        key=lambda item: item["_relevance_score"],
+        reverse=True
+    )
+
+    # 7. Remove internal scoring information
+    for result in relevant_results:
+        result.pop("_relevance_score", None)
+
+    return relevant_results
+
 
 def search_web(query, max_results=5):
-    # Prepare fallback queries
     fallback_queries = [
         query,
-        re.sub(
-            r"\b(find|show|search|which|problems|involving|about|other|for)\b",
-            "",
-            query,
-            flags=re.IGNORECASE
-        ),
-        f"{query} programming algorithm LeetCode GeeksforGeeks"
+        re.sub(r"[^\w\s]", " ", query),
+        " ".join(tokenize(query))
     ]
 
-    # Remove duplicate and empty queries
     fallback_queries = list(dict.fromkeys(
         q.strip() for q in fallback_queries if q.strip()
     ))
+
+    all_results = []
 
     for search_query in fallback_queries:
         for attempt in range(2):
@@ -34,25 +147,13 @@ def search_web(query, max_results=5):
                     results = ddgs.text(
                         search_query,
                         max_results=max_results,
-                        backend="bing, google, brave, mojeek, yahoo"
+                        backend="bing,google,brave,mojeek,yahoo"
                     )
 
-                valid_results = [
-                    result for result in results
-                    if result.get("title", "").strip()
-                    and result.get("href", "").strip()
-                    and result.get("body", "").strip()
-                ]
+                all_results.extend(results)
 
-                if valid_results:
-                    logger.info(
-                        "Web search succeeded for query=%r "
-                        "(original=%r), results=%d",
-                        search_query,
-                        query,
-                        len(valid_results)
-                    )
-                    return valid_results
+                if results:
+                    break
 
             except DDGSException as exc:
                 logger.warning(
@@ -65,5 +166,16 @@ def search_web(query, max_results=5):
                 if attempt == 0:
                     time.sleep(1)
 
-    logger.warning("No web results found for original query=%r", query)
-    return []
+    relevant_results = filter_relevant_results(
+        query,
+        all_results
+    )
+
+    logger.info(
+        "Original query=%r, collected=%d, relevant=%d",
+        query,
+        len(all_results),
+        len(relevant_results)
+    )
+
+    return relevant_results[:max_results]
