@@ -1,4 +1,3 @@
-
 import logging
 import math
 import re
@@ -7,6 +6,8 @@ from collections import Counter
 
 from ddgs import DDGS
 from ddgs.exceptions import DDGSException
+
+from importlib.metadata import version
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def cosine_similarity(query, document):
     if not query_words or not document_words:
         return 0.0
 
-    documents = [query_words, document_words]
+    # documents = [query_words, document_words]
 
     document_frequency = Counter(
         word
@@ -153,6 +154,11 @@ def search_web(query, max_results=5):
 
     all_results = []
 
+    logger.info(
+        "DIAGNOSTIC: Installed DDGS version: %s",
+        version("ddgs")
+    )
+
     for search_query in fallback_queries:
         for attempt in range(2):
             try:
@@ -160,8 +166,15 @@ def search_web(query, max_results=5):
                     results = ddgs.text(
                         search_query,
                         max_results=max_results,
-                        backend="bing,google,brave,mojeek,yahoo"
+                        backend="mojeek,yahoo"
                     )
+
+                logger.info(
+                    "DIAGNOSTIC: Query=%r | Raw result count=%d | Titles=%r",
+                    search_query,
+                    len(results),
+                    [r.get("title", "") for r in results]
+                )
 
                 all_results.extend(results)
 
@@ -182,6 +195,14 @@ def search_web(query, max_results=5):
     relevant_results = filter_relevant_results(
         query,
         all_results
+    )
+
+    logger.info(
+        "DIAGNOSTIC: Original query=%r | Total raw results=%d | Filtered results=%d | Final titles=%r",
+        query,
+        len(all_results),
+        len(relevant_results),
+        [r.get("title", "") for r in relevant_results]
     )
 
     logger.info(
