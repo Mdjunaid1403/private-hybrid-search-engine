@@ -34,7 +34,7 @@ def search_web(query, max_results=5):
                     results = ddgs.text(
                         search_query,
                         max_results=max_results,
-                        backend="auto"
+                        backend="bing, google, brave, mojeek, yahoo"
                     )
 
                 valid_results = [
@@ -54,11 +54,12 @@ def search_web(query, max_results=5):
                     )
                     return valid_results
 
-            except DDGSException:
-                logger.exception(
-                    "Web search failed for query=%r, attempt=%d",
+            except DDGSException as exc:
+                logger.warning(
+                    "Web search attempt %d failed for query=%r: %s",
+                    attempt + 1,
                     search_query,
-                    attempt + 1
+                    exc
                 )
 
                 if attempt == 0:
